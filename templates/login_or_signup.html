@@ -1,0 +1,45 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+       "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=iso-8859-1" />
+  <title>Bookmarks</title>
+</head>
+
+<body class="login" onLoad="document.forms[0].elements[0].focus();">
+<div class="Container">
+  <div id="Dialog">
+    <form action="/auth/login" method="post">
+      <dl>
+    		<dt>Username or Email:</dt>
+        <dd><input  name="username_or_email" type="username" value="" /></dd>
+    		<dt>Password:</dt>
+    		<dd>
+    		  <input id="password" name="password" type="password" />
+    		  
+        </dd>
+    	</dl>
+	<input type="submit" value="Login" class="submit"/>
+    </form>
+    <form action="/auth/signup" method="post">
+      <dl>
+    		<dt>Username:</dt>
+        <dd><input id="username" name="username" type="username" value="" /></dd>
+    		<dt>Email:</dt>
+        <dd><input id="email" name="email" type="email" value="" /></dd>
+ 
+    		<dt>Password:</dt>
+    		<dd>
+    		  <input id="password" name="password" type="password" />
+    		  
+        </dd>
+	<input type="submit" value="Sign Up" class="submit"/>
+    </form>
+
+  </div>
+</div>
+
+</body>
+</html>
