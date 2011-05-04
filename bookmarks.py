@@ -38,7 +38,7 @@ class Application(tornado.web.Application):
     def __init__(self):
         handlers = [
             (r"/", MainHandler),
-            (r"/bookmarks/([0-9]*)", BookmarkHandler),
+            (r"/([0-9]+)/bookmarks/([0-9]*)", BookmarkHandler),
             (r"/upload", UploadHandler),
             (r"/auth/login", AuthLoginHandler),
             (r"/auth/logout", AuthLogoutHandler),
@@ -65,6 +65,7 @@ class BaseHandler(tornado.web.RequestHandler):
         
     def get_current_user(self):
         user_id = self.get_secure_cookie("user")
+        print "user_id = %s " % user_id
         if not user_id:
             return None
         else:
@@ -97,6 +98,7 @@ class AuthSignupHandler(BaseHandler):
     def get(self):
         user = self.get_current_user()
         if user:
+            print "clear cookie"
             self.clear_secure_cookie("user")
         self.render("login_or_signup.html")
         
@@ -116,12 +118,14 @@ class AuthLoginHandler(BaseHandler):
                 if not user:
                     self.render("login_or_signup.html", error_message = "No such user")
                     return
+            print "set cookie = %s" % str(user.id)
             self.set_secure_cookie("user", str(user.id))
             self.redirect("/")
         
     def get(self):
         user = self.get_current_user()
         if user:
+            print "clear cookie"
             self.clear_secure_cookie("user")
         self.render("login_or_signup.html") # need render this page?
         
@@ -135,14 +139,15 @@ class AuthLogoutHandler(BaseHandler):
 class MainHandler(BaseHandler):
     def get(self):
         user = self.get_current_user()
+        print user
         if not user:
             self.render("login_or_signup.html")
         else:
             entries = []
-            results = BOOKMARKS_DB.query("SELECT * FROM bookmarks where user_id=\"%s\"" % user.id)
+            results = BOOKMARKS_DB.query("SELECT * FROM bookmarks WHERE user_id=\"%s\" ORDER BY modified_at ASC" % user.id)
             for record in results:
-                entries.append((record.title, record.url, record.last_modified))
-            self.render("main.html", entries = entries)
+                entries.append((record.title, record.url, record.modified_at))
+            self.render("main.html", user = user, entries = entries)
         
 class UploadHandler(BaseHandler):
     def get(self):
@@ -153,48 +158,84 @@ class UploadHandler(BaseHandler):
             title = self.get_argument('title')
             url = self.get_argument('url')
             date = int(time.time())
-            record = BOOKMARKS_DB.get('SELECT * FROM bookmarks WHERE title=\"%s\" and url=\"%s\"' % (title, url))
+            record = BOOKMARKS_DB.get('SELECT * FROM bookmarks WHERE user_id=\"%d\" AND title=\"%s\" AND url=\"%s\"' % (user.id, title, url))
             if record is None:
-                BOOKMARKS_DB.execute('INSERT INTO bookmarks (title, url, last_modified) VALUES (\"%s\", \"%s\", \"%d\")' % (title, url, date))
+                BOOKMARKS_DB.execute('INSERT INTO bookmarks (title, url, modified_at, user_id, tag) VALUES (\"%s\", \"%s\", \"%d\", \"%d\", 0)' % (title, url, date, user.id))
                 self.write("Updated")
             else:
-                BOOKMARKS_DB.execute('UPDATE bookmarks SET last_modified=\"%d\" WHERE title=\"%s\" and url=\"%s\"' % (date, title, url))
+                BOOKMARKS_DB.execute('UPDATE bookmarks SET modified_at=\"%d\" WHERE title=\"%s\" and url=\"%s\"' % (date, title, url))
                 self.write("Saved")
             BOOKMARKS_DB.commit()
                             
 class BookmarkHandler(BaseHandler):
     ''' REST style API...No test at all.'''
     def get(self, user_id, bookmark_id):
+        print "user_id %s id %s" % (user_id, bookmark_id)
+        user = BOOKMARKS_DB.get("SELECT * FROM users WHERE id=\"%s\"" % user_id)
+        if not user:
+            raise Exception()
+            return
+            
         try:
             index = int(bookmark_id)
-            record = BOOKMARKS_DB.get('SELECT * FROM bookmarks WHERE id=\"%d\"' % index)
-            if record is None:
+            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at ASC' % user.id)
+            if records is None:
                 raise Exception()
-            self.write(json.dumps((record.title, record.url, record.last_modified)))
+            if index >= len(records):
+                return
+            self.write(json.dumps((records[index].title, record[index].url, record[index].last_modified)))
         except ValueError:
             results = []
-            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks')
+            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at ASC' % user.id)
             for record in records:
                 results.append((record.title, record.url, record.last_modified))
             self.write(json.dumps(results))
             
     def put(self, user_id, bookmark_id):
+        current_user_id = self.get_secure_cookie("user")
+        if not current_user_id:
+            self.render("login_or_signup.html")
+            
+        if user_id != current_user_id:
+            raise Exception()
+            return
+                    
         title, url = json.loads(self.request.body)
         date = int(time.time())
         try:
             index = int(bookmark_id)
-            record = BOOKMARKS_DB.get('SELECT * FROM bookmarks WHERE id=\"%d\"' % index)
+            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at ASC' % user_id)
+            if records is None:
+                raise Exception()
+            if index >= len(records):
+                raise ValueError()
+                
+            record = BOOKMARKS_DB.get('SELECT * FROM bookmarks WHERE id=\"%d\"' % records[index].id)
             if record is not None:
-                BOOKMARKS_DB.execute('UPDATE bookmarks SET title=\"%s\", url=\"%s\", last_modified=\"%d\" WHERE id = \"%d\"' % (title, url, date, index))
+                BOOKMARKS_DB.execute('UPDATE bookmarks SET title=\"%s\", url=\"%s\", modified_at=\"%d\" WHERE id = \"%d\"' % (title, url, date, record.id))
         except ValueError:
-            BOOKMARKS_DB.execute('INSERT INTO bookmarks (title, url, last_modified) VALUES (\"%s\", \"%s\", \"%d\")' % (title, url, date))
+            BOOKMARKS_DB.execute('INSERT INTO bookmarks (title, url, modified_at, tag) VALUES (\"%s\", \"%s\", \"%d\", 0)' % (title, url, date))
         finally:
             BOOKMARKS_DB.commit()
         
     def delete(self, user_id, bookmark_id):
+        current_user_id = self.get_secure_cookie("user")
+        if not current_user_id:
+            self.render("login_or_signup.html")
+            
+        if user_id != current_user_id:
+            raise Exception()
+            return
+        
         try:
             index = int(bookmark_id)
-            BOOKMARKS_DB.execute('DELETE FROM bookmarks WHERE id=\"%d\"' % index)
+            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at ASC' % user_id)
+            if records is None:
+                raise Exception()
+            if index >= len(records):
+                raise ValueError()
+                
+            BOOKMARKS_DB.execute('DELETE FROM bookmarks WHERE id=\"%d\"' % records[index].id)
             BOOKMARKS_DB.commit()
         except ValueError:
             self.write("Invalid bookmark_id")

@@ -12,5 +12,6 @@ CREATE TABLE bookmarks (
     title text NOT NULL,
     url text NOT NULL,
     user_id integer NOT NULL,
-    last_modified long NOT NULL
+    tag integer DEFAULT 0,
+    modified_at long NOT NULL
 );
