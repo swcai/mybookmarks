@@ -144,10 +144,10 @@ class MainHandler(BaseHandler):
             self.render("login_or_signup.html")
         else:
             entries = []
-            results = BOOKMARKS_DB.query("SELECT * FROM bookmarks WHERE user_id=\"%s\" ORDER BY modified_at ASC" % user.id)
+            results = BOOKMARKS_DB.query("SELECT * FROM bookmarks WHERE user_id=\"%s\" ORDER BY modified_at DESC" % user.id)
             for record in results:
                 entries.append((record.title, record.url, record.modified_at))
-            self.render("main.html", user = user, entries = entries)
+            self.render("view.html", user = user, entries = entries)
         
 class UploadHandler(BaseHandler):
     def get(self):
@@ -161,16 +161,14 @@ class UploadHandler(BaseHandler):
             record = BOOKMARKS_DB.get('SELECT * FROM bookmarks WHERE user_id=\"%d\" AND title=\"%s\" AND url=\"%s\"' % (user.id, title, url))
             if record is None:
                 BOOKMARKS_DB.execute('INSERT INTO bookmarks (title, url, modified_at, user_id, tag) VALUES (\"%s\", \"%s\", \"%d\", \"%d\", 0)' % (title, url, date, user.id))
-                self.write("Updated")
             else:
                 BOOKMARKS_DB.execute('UPDATE bookmarks SET modified_at=\"%d\" WHERE title=\"%s\" and url=\"%s\"' % (date, title, url))
-                self.write("Saved")
             BOOKMARKS_DB.commit()
-                            
+            self.render("client.jsp")
+
 class BookmarkHandler(BaseHandler):
     ''' REST style API...No test at all.'''
     def get(self, user_id, bookmark_id):
-        print "user_id %s id %s" % (user_id, bookmark_id)
         user = BOOKMARKS_DB.get("SELECT * FROM users WHERE id=\"%s\"" % user_id)
         if not user:
             raise Exception()
@@ -178,7 +176,7 @@ class BookmarkHandler(BaseHandler):
             
         try:
             index = int(bookmark_id)
-            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at ASC' % user.id)
+            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at DESC' % user.id)
             if records is None:
                 raise Exception()
             if index >= len(records):
@@ -186,7 +184,7 @@ class BookmarkHandler(BaseHandler):
             self.write(json.dumps((records[index].title, record[index].url, record[index].last_modified)))
         except ValueError:
             results = []
-            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at ASC' % user.id)
+            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at DESC' % user.id)
             for record in records:
                 results.append((record.title, record.url, record.last_modified))
             self.write(json.dumps(results))
@@ -204,7 +202,7 @@ class BookmarkHandler(BaseHandler):
         date = int(time.time())
         try:
             index = int(bookmark_id)
-            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at ASC' % user_id)
+            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at DESC' % user_id)
             if records is None:
                 raise Exception()
             if index >= len(records):
@@ -229,7 +227,7 @@ class BookmarkHandler(BaseHandler):
         
         try:
             index = int(bookmark_id)
-            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at ASC' % user_id)
+            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at DESC' % user_id)
             if records is None:
                 raise Exception()
             if index >= len(records):

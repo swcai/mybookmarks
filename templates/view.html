@@ -1,5 +1,13 @@
 {% extends "base.html" %}
 {% block body %}
+    <div id="tools_container">
+        <p style="margin-bottom: 3px;">Save directly to this folder:</p>
+        <!-- <a href="javascript:function iprl5(){var d=document,z=d.createElement('scr'+'ipt'),b=d.body,l=d.location;try{if(!b)throw(0);z.setAttribute('src',l.protocol+'//localhost:8888/upload?title='+encodeURIComponent(d.title)+'&url='+encodeURIComponent(l.href));b.appendChild(z);}catch(e){alert('Please wait until the page has loaded.');}}iprl5();void(0)" -->
+        <a href="javascript:void((function(){var e=document.createElement('script');e.setAttribute('type','text/javascript');e.setAttribute('src','http://localhost:8888/static/upload.js');document.body.appendChild(e)})())"
+   class="bookmarklet"
+   onclick="return explain_bookmarklet();"
+   title="Read Later">Read it Later</a>
+  </div>
   <ul class="archive">
     {% for entry in entries %}
       <li>
