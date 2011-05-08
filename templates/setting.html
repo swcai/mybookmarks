@@ -1,0 +1,25 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+       "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=iso-8859-1" />
+  <title>Setting</title>
+</head>
+
+<body class="setting" onLoad="document.forms[0].elements[0].focus();">
+<div class="Container">
+  <div id="Dialog">
+    <form action="/setting" method="post">
+      <dl>
+    		<dt>Password:</dt> <dd> <input id="password" name="password1" type="password" /> </dd>
+    		<dt>Password Again:</dt> <dd> <input id="password" name="password2" type="password" /> </dd>
+    	</dl>
+	<input type="submit" value="Change the password" class="submit"/>
+        <input name="username" type="hidden" value="{{ user.username }}" />
+    </form>
+  </div>
+</div>
+</body>
+</html>

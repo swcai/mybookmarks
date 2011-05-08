@@ -31,6 +31,8 @@ import database
 
 define("port", default=8888, help="run on the given port", type=int)
 
+# TODO update the functions to use exception
+# TODO add MYSQL support
 BOOKMARKS_DB = database.Connection("bookmarks.db")
 
 class Application(tornado.web.Application):
@@ -38,14 +40,16 @@ class Application(tornado.web.Application):
     def __init__(self):
         handlers = [
             (r"/", MainHandler),
-            (r"/([0-9]+)/bookmarks/([0-9]*)", BookmarkHandler),
+            (r"/(\w+)/bookmarks/([0-9]*)", BookmarkHandler),
             (r"/upload", UploadHandler),
+            (r"/setting", SettingHandler),
             (r"/auth/login", AuthLoginHandler),
             (r"/auth/logout", AuthLogoutHandler),
             (r"/auth/signup", AuthSignupHandler),
         ]
         settings = dict(
-            cookie_secret="32oETzKXQAGaYdkL5gEmGeJJFuYh7EQnp2XdTP1o/Vo=", # todo update cookie_secret
+            # TODO update cookie secret
+            cookie_secret="32oETzKXQAGaYdkL5gEmGeJJFuYh7EQnp2XdTP1o/Vo=",
             login_url="/auth/login",
             template_path=  os.path.join(os.path.dirname(__file__), "templates"),
             static_path = os.path.join(os.path.dirname(__file__), "static"),
@@ -54,24 +58,36 @@ class Application(tornado.web.Application):
         tornado.web.Application.__init__(self, handlers, **settings)
         
 class BaseHandler(tornado.web.RequestHandler):
+    # TODO validate the user name from remote
     def is_valid_username(self, name):
         return True
         
+    # TODO validate the email address from remote
     def is_valid_email(self, email):
         return True
         
+    # TODO validate the password from remote
     def is_valid_password(self, password):
         return True
         
     def get_current_user(self):
         user_id = self.get_secure_cookie("user")
-        print "user_id = %s " % user_id
         if not user_id:
             return None
         else:
             return BOOKMARKS_DB.get("SELECT * FROM users WHERE id = %d" % int(user_id))
             
+    def get_user_from_alias(self, user_alias):
+        return BOOKMARKS_DB.get("SELECT * FROM users WHERE alias=\"%s\"" % user_alias)
+        
 class AuthSignupHandler(BaseHandler):
+    def _generate_alias(self, name, email):
+        s = hashlib.sha1()
+        s.update(name)
+        s.update(email)
+        s.update(str(time.time()))
+        return s.hexdigest()[:6]
+        
     def post(self):
         username = self.get_argument("username")
         email = self.get_argument("email")
@@ -81,12 +97,14 @@ class AuthSignupHandler(BaseHandler):
             not self.is_valid_email(email) or \
             not self.is_valid_password(password):
             self.render("login_or_signup.html", error_message = "Invalid email or user name")
-        else:    
+        else:
             user = BOOKMARKS_DB.get("SELECT * FROM users WHERE email=\"%s\"" %
                 email)
             if not user:
-                BOOKMARKS_DB.execute( "INSERT INTO users (username, email, password) \
-                    VALUES (\"%s\", \"%s\", \"%s\")" % (username, email, password))
+                BOOKMARKS_DB.execute( "INSERT INTO users (username, email, password, alias) \
+                    VALUES (\"%s\", \"%s\", \"%s\")" % \
+                        (username, email, password, \
+                            self._generate_alias(username, email)))
                 user = BOOKMARKS_DB.get("SELECT * FROM users WHERE email=\"%s\"" %
                     email)
                 BOOKMARKS_DB.commit()
@@ -98,7 +116,6 @@ class AuthSignupHandler(BaseHandler):
     def get(self):
         user = self.get_current_user()
         if user:
-            print "clear cookie"
             self.clear_secure_cookie("user")
         self.render("login_or_signup.html")
         
@@ -118,14 +135,12 @@ class AuthLoginHandler(BaseHandler):
                 if not user:
                     self.render("login_or_signup.html", error_message = "No such user")
                     return
-            print "set cookie = %s" % str(user.id)
             self.set_secure_cookie("user", str(user.id))
             self.redirect("/")
         
     def get(self):
         user = self.get_current_user()
         if user:
-            print "clear cookie"
             self.clear_secure_cookie("user")
         self.render("login_or_signup.html") # need render this page?
         
@@ -147,7 +162,32 @@ class MainHandler(BaseHandler):
             results = BOOKMARKS_DB.query("SELECT * FROM bookmarks WHERE user_id=\"%s\" ORDER BY modified_at DESC" % user.id)
             for record in results:
                 entries.append((record.title, record.url, record.modified_at))
-            self.render("view.html", user = user, entries = entries)
+            # TODO update the main page (including logout link and setting link)
+            self.render("main.html", user = user, entries = entries)
+
+class SettingHandler(BaseHandler):
+    def get(self):
+        user = self.get_current_user()
+        if not user:
+            self.render("login_or_signup.html")
+        else:
+            # TODO Polish setting page
+            self.render("setting.html", user = user)
+            
+    def post(self):
+        user = self.get_current_user()
+        if not user:
+            self.render("login_or_signup.html")
+        else:
+            username = self.get_argument('username')
+            password1 = self.get_argument('password1')
+            password2 = self.get_argument('password2')
+            if username != user.username or password1 != password2:
+                raise Exception()
+                return
+            BOOKMARKS_DB.execute('UPDATE users SET password=\"%s\" WHERE id=\"%d\"' % (password1, user.id))
+            BOOKMARKS_DB.commit()
+            self.redirect("/")
         
 class UploadHandler(BaseHandler):
     def get(self):
@@ -164,12 +204,12 @@ class UploadHandler(BaseHandler):
             else:
                 BOOKMARKS_DB.execute('UPDATE bookmarks SET modified_at=\"%d\" WHERE title=\"%s\" and url=\"%s\"' % (date, title, url))
             BOOKMARKS_DB.commit()
-            self.render("client.jsp")
 
+# TODO test all the REST APIs
 class BookmarkHandler(BaseHandler):
-    ''' REST style API...No test at all.'''
-    def get(self, user_id, bookmark_id):
-        user = BOOKMARKS_DB.get("SELECT * FROM users WHERE id=\"%s\"" % user_id)
+    
+    def get(self, user_alias, bookmark_id):
+        user = self.get_user_from_alias(user_alias)
         if not user:
             raise Exception()
             return
@@ -189,12 +229,13 @@ class BookmarkHandler(BaseHandler):
                 results.append((record.title, record.url, record.last_modified))
             self.write(json.dumps(results))
             
-    def put(self, user_id, bookmark_id):
+    def put(self, user_alias, bookmark_id):
         current_user_id = self.get_secure_cookie("user")
         if not current_user_id:
             self.render("login_or_signup.html")
-            
-        if user_id != current_user_id:
+        
+        user = self.get_user_from_alias(user_alias)
+        if not user or user.id != current_user_id:
             raise Exception()
             return
                     
@@ -202,7 +243,7 @@ class BookmarkHandler(BaseHandler):
         date = int(time.time())
         try:
             index = int(bookmark_id)
-            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at DESC' % user_id)
+            records = BOOKMARKS_DB.query('SELECT * FROM bookmarks WHERE user_id=\"%d\" ORDER BY modified_at DESC' % user.id)
             if records is None:
                 raise Exception()
             if index >= len(records):
@@ -212,7 +253,7 @@ class BookmarkHandler(BaseHandler):
             if record is not None:
                 BOOKMARKS_DB.execute('UPDATE bookmarks SET title=\"%s\", url=\"%s\", modified_at=\"%d\" WHERE id = \"%d\"' % (title, url, date, record.id))
         except ValueError:
-            BOOKMARKS_DB.execute('INSERT INTO bookmarks (title, url, modified_at, tag) VALUES (\"%s\", \"%s\", \"%d\", 0)' % (title, url, date))
+            BOOKMARKS_DB.execute('INSERT INTO bookmarks (title, url, modified_at, tag, user_id) VALUES (\"%s\", \"%s\", \"%d\", 0, \"%d\")' % (title, url, date, user.id))
         finally:
             BOOKMARKS_DB.commit()
         
@@ -221,7 +262,8 @@ class BookmarkHandler(BaseHandler):
         if not current_user_id:
             self.render("login_or_signup.html")
             
-        if user_id != current_user_id:
+        user = self.get_user_from_alias(user_alias)
+        if not user or user.id != current_user_id:
             raise Exception()
             return
         

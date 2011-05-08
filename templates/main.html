@@ -1,18 +1,18 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/> 
-    <title>My bookmarks</title>
-    <link rel="stylesheet" href="{{ static_url("bookmark.css") }}" type="text/css"/>
-    {% block head %}{% end %}
-  </head>
-  <body>
-    <div class="body">
-      <div class="header">
-        <h1>Bookmarks</h1>
-      </div>
-      <div class="content">{% block body %}{% end %}</div>
-    </div>
-    {% block bottom %}{% end %}
-  </body>
-</html>
+{% extends "base.html" %}
+{% block body %}
+    <div id="tools_container">
+        <p style="margin-bottom: 3px;">Save directly to this folder:</p>
+        <a href="javascript:void((function(){var e=document.createElement('script');e.setAttribute('type','text/javascript');e.setAttribute('src','http://localhost:8888/static/upload.js');document.body.appendChild(e)})())"
+   class="bookmarklet"
+   onclick="return explain_bookmarklet();"
+   title="Read Later">Read it Later</a>
+  </div>
+  <ul class="archive">
+    {% for entry in entries %}
+      <li>
+        <div class="date" style="float:right">{{ locale.format_date(entry[2], full_format=True, shorter=True) }}</div>
+        <div class="body"><a href="{{ entry[1] }}">{{ escape(entry[0]) }}</a></div>
+      </li>
+    {% end %}
+  </ul>
+{% end %}

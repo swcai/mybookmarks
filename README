@@ -1,3 +1,4 @@
 My exercise for REST API - a clone of instapaper
 
-May 4 - Add login/logout/signup support
+May 4 - Added login/logout/signup support
+May 7 - Improved JS. Bookmarklet works! Deployed to stanleycai.com:8888
